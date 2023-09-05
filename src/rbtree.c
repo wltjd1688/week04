@@ -19,8 +19,6 @@ void delete_node(node_t* node, rbtree *t){
   delete_node(node->left,t);
   delete_node(node->right,t);
   free(node);
-  node = NULL;
-  return;
 }
 
 void delete_rbtree(rbtree *t) {
@@ -29,10 +27,7 @@ void delete_rbtree(rbtree *t) {
   }
   delete_node(t->root,t);
   free(t->nil);
-  t->nil = NULL;
   free(t);
-  t = NULL;
-  return;
 }
 
 // 왼쪽 로테이션
@@ -69,10 +64,10 @@ void rbtree_right_rotate(rbtree *t, node_t *x) {
   if (x->parent == t->nil){
     t->root = y;
   }
-  else if (x == x->parent->left){
-    x->parent->left = y;
-  } else {
+  else if (x == x->parent->right){
     x->parent->right = y;
+  } else {
+    x->parent->left = y;
   }
   y->right = x;
   x->parent = y;
@@ -152,17 +147,17 @@ node_t* rbtree_insert(rbtree *t, const key_t key) {
 
 node_t* rbtree_find(const rbtree *t, const key_t key) {
   node_t* current = t->root;
-  while (current != t->nil){
-    if(key == current->key){
-      return current;
-    }
-    else if (key < current->key){
+  while (current != t->nil && key != current->key){
+    if (key < current->key){
       current = current->left;
     } else{
       current = current->right;
     }
   }
-  return NULL;
+  if (current==t->nil){
+    return NULL;
+  }
+  return current;
 }
 
 node_t* rbtree_min(const rbtree *t) {
@@ -181,12 +176,136 @@ node_t* rbtree_max(const rbtree *t) {
   return current;
 }
 
-int rbtree_erase(rbtree *t, node_t *p) {
-  // TODO: implement erase
+void rbtree_transplant(rbtree* t,node_t* u,node_t* v){
+  if (u->parent == t->nil){
+    t->root = v;
+  } else if(u==u->parent->left){
+    u->parent->left = v;
+  } else {
+    u -> parent -> right = v;
+  }
+  v->parent = u->parent;
+  return ;
+}
+
+void rbtree_erase_fixup(rbtree* t, node_t* x){
+  node_t* w;
+  while(x!= t->root && x->color == RBTREE_BLACK){
+    if (x==x->parent->left){
+      w = x->parent->right;
+      if(w->color==RBTREE_RED){
+        w->color = RBTREE_BLACK;
+        x->parent->color = RBTREE_RED;
+        rbtree_left_rotate(t,x->parent);
+        w = x->parent->right;
+      }
+      if(w->left->color == RBTREE_BLACK && w->right->color == RBTREE_BLACK){
+        w->color = RBTREE_RED;
+        x= x->parent;
+      }else{
+        if(w->right->color==RBTREE_BLACK){
+          w->left->color = RBTREE_BLACK;
+          w->color = RBTREE_RED;
+          rbtree_right_rotate(t,w);
+          w = x->parent->right;
+        }
+        w->color = x->parent->color;
+        x->parent->color = RBTREE_BLACK;
+        w->right->color = RBTREE_BLACK;
+        rbtree_left_rotate(t,x->parent);
+        x = t->root;
+      }
+    } else {
+      w = x->parent->left;
+      if(w->color==RBTREE_RED){
+        w->color = RBTREE_BLACK;
+        x->parent->color = RBTREE_RED;
+        rbtree_right_rotate(t,x->parent);
+        w = x->parent->left;
+      }
+      if(w->right->color == RBTREE_BLACK && w->left->color==RBTREE_BLACK){
+        w->color = RBTREE_RED;
+        x = x->parent;
+      } else {
+        if(w->left->color == RBTREE_BLACK){
+          w->right->color = RBTREE_BLACK;
+          w->color = RBTREE_RED;
+          rbtree_left_rotate(t,w);
+          w = x->parent->left;
+        }
+        w->color = x->parent->color;
+        x->parent->color = RBTREE_BLACK;
+        w->left->color = RBTREE_BLACK;
+        rbtree_right_rotate(t,x->parent);
+        x = t->root;
+      }
+    }
+  }
+  x->color = RBTREE_BLACK;
+  return ;
+}
+// 오른쪽 서브트리의 min값 찾기
+node_t* search_min(rbtree*t, node_t *target){
+  node_t* current = target;
+  while(current->left != t->nil){
+      current = current->left;
+  }
+  return current;
+}
+
+int rbtree_erase(rbtree *t, node_t *z) {
+  node_t* x;
+  node_t* y = z;
+  color_t y_original_color = y->color;
+  if (z->left == t->nil){
+    x = z->right;
+    rbtree_transplant(t,z,z->right);
+  } else if (z->right == t->nil) {
+    x = z->left;
+    rbtree_transplant(t,z,z->left);
+  } else {
+    y = search_min(t,z->right);
+    y_original_color = y->color;
+    x = y->right;
+    if (y->parent == z){
+      x->parent = y;
+    } else{
+      rbtree_transplant(t,y,y->right);
+      y->right = z->right;
+      y->right->parent = y;
+    }
+    rbtree_transplant(t,z,y);
+    y->left = z->left;
+    y->left->parent = y;
+    y->color= z->color;
+    free(z);
+    z = NULL;
+  } if (y_original_color == RBTREE_BLACK){
+    rbtree_erase_fixup(t,x);
+  }
+  free(z);
   return 0;
 }
 
+int rbtree_inorder(node_t *nil, node_t *root, key_t *arr, const size_t n,int idx) {
+  if(root==nil){
+    return idx;
+  }
+  if (idx==n){
+    return idx;
+  }
+  idx = rbtree_inorder(nil, root->left, arr, n, idx);
+  if (idx<n){
+    arr[idx++] = root -> key;
+  }
+  idx = rbtree_inorder(nil, root->right, arr, n, idx);
+  return idx;
+}
+
 int rbtree_to_array(const rbtree *t, key_t *arr, const size_t n) {
-  // TODO: implement to_array
+  if (t->root==t->nil){
+    return 0;
+  }
+  rbtree_inorder(t->nil, t->root, arr,n,0);
   return 0;
 }
