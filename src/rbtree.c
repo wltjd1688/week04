@@ -119,29 +119,29 @@ void rbtree_inserte_fixup(rbtree* t, node_t* z){
 node_t* rbtree_insert(rbtree *t, const key_t key) {
   node_t* y = t->nil;
   node_t* x = t->root;
-  node_t* z = (node_t*)malloc(sizeof(node_t));
-  z->key = key;
+  node_t* k = (node_t*)malloc(sizeof(node_t));
+  k->key = key;
 
   while (x != t->nil){
     y = x;
-    if (z->key < x->key){
+    if (k->key < x->key){
       x = x->left;
     } else {
       x = x-> right;
     }
   }
-  z->parent = y;
+  k->parent = y;
   if (y==t->nil){
-    t->root = z;
-  } else if (z->key < y->key) {
-    y->left = z;
+    t->root = k;
+  } else if (k->key < y->key) {
+    y->left = k;
   } else {
-    y->right = z;
+    y->right = k;
   }
-  z->left = t->nil;
-  z->right = t->nil;
-  z->color = RBTREE_RED;
-  rbtree_inserte_fixup(t,z);
+  k->left = t->nil;
+  k->right = t->nil;
+  k->color = RBTREE_RED;
+  rbtree_inserte_fixup(t,k);
   return t->root;
 }
 
@@ -278,12 +278,11 @@ int rbtree_erase(rbtree *t, node_t *z) {
     y->left = z->left;
     y->left->parent = y;
     y->color= z->color;
-    free(z);
-    z = NULL;
   } if (y_original_color == RBTREE_BLACK){
     rbtree_erase_fixup(t,x);
   }
   free(z);
+  z=NULL;
   return 0;
 }
 
